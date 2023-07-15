@@ -43,49 +43,6 @@ resource "azurerm_subnet" "snet" {
   address_prefixes     = [azurerm_virtual_network.vnet.address_space[0]]
 }
 
-resource "azurerm_network_security_group" "nsg" {
-  name                = "${var.prefix}-nsg"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  security_rule {
-    name                       = "ssh"
-    priority                   = 100
-    direction                  = "Inbound"
-    protocol                   = "Tcp"
-    source_address_prefixes    = ["127.0.0.1/32"] # Change to your IP
-    source_port_range          = "*"
-    destination_address_prefix = "*"
-    destination_port_range     = 22
-    access                     = "Allow"
-  }
-}
-
-resource "azurerm_subnet_network_security_group_association" "assoc" {
-  subnet_id                 = azurerm_subnet.snet.id
-  network_security_group_id = azurerm_network_security_group.nsg.id
-}
-
-resource "azurerm_public_ip" "pip" {
-  name                = "${var.prefix}-pip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-}
-
-resource "azurerm_network_interface" "nic" {
-  name                = "${var.prefix}-nic"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  ip_configuration {
-    name                          = "primary"
-    subnet_id                     = azurerm_subnet.snet.id
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.pip.id
-  }
-}
-
 resource "azurerm_marketplace_agreement" "rocky" {
   publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
   offer     = "rockylinux-9"
@@ -99,40 +56,33 @@ data "azurerm_platform_image" "rocky" {
   sku       = "rockylinux-9"
 }
 
-resource "azurerm_linux_virtual_machine" "vm" {
-  depends_on            = [azurerm_marketplace_agreement.rocky]
-  name                  = "${var.prefix}-vm"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  size                  = "Standard_B2s"
-  admin_username        = "frank"
-  network_interface_ids = [azurerm_network_interface.nic.id]
+module "vm" {
+  depends_on = [azurerm_marketplace_agreement.rocky]
+  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=1.0.0"
 
-  admin_ssh_key {
-    username   = "frank"
-    public_key = file("~/.ssh/id_rsa.pub")
+  admin_user          = "frank"
+  allowed_cidr        = "127.0.0.1/32" # Replace with your IP
+  location            = var.location
+  prefix              = var.prefix
+  public_key          = file("~/.ssh/id_rsa.pub")
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.snet.id
+  vm_count            = 1
+  vm_size             = "Standard_B2s"
+
+  plan = {
+    name      = "rockylinux-9"
+    publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
+    product   = "rockylinux-9"
   }
-
-  os_disk {
-    name                 = "${var.prefix}-osdisk"
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  source_image_reference {
+  source_image_reference = {
     publisher = data.azurerm_platform_image.rocky.publisher
     offer     = data.azurerm_platform_image.rocky.offer
     sku       = data.azurerm_platform_image.rocky.sku
     version   = data.azurerm_platform_image.rocky.version
   }
-
-  plan {
-    name      = "rockylinux-9"
-    publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
-    product   = "rockylinux-9"
-  }
 }
 
-output "vm_public_ip" {
-  value = azurerm_public_ip.pip.ip_address
+output "vm_public_ips" {
+  value = module.vm.vm_public_ips
 }
