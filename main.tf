@@ -47,6 +47,18 @@ resource "azurerm_network_security_group" "nsg" {
   }
 
   security_rule {
+    name                       = "allow-azure-lb"
+    priority                   = 3990
+    direction                  = "Inbound"
+    protocol                   = "*"
+    source_address_prefix      = "AzureLoadBalancer"
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+    destination_port_range     = "*"
+    access                     = "Allow"
+  }
+
+  security_rule {
     name                       = "deny-others"
     priority                   = 4000
     direction                  = "Inbound"
@@ -74,17 +86,19 @@ data "azurerm_platform_image" "rocky" {
 
 module "vm" {
   depends_on = [azurerm_marketplace_agreement.rocky]
-  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.0.0"
+  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.1.0"
 
   admin_user                = "frank"
+  create_load_balancer      = true
   custom_data               = base64encode(file("cloud-init.yml"))
+  fault_domain_count        = var.fault_domain_count
   location                  = var.location
   network_security_group_id = azurerm_network_security_group.nsg.id
   prefix                    = var.prefix
   public_key                = file("~/.ssh/id_rsa.pub")
   resource_group_name       = azurerm_resource_group.rg.name
   subnet_id                 = azurerm_subnet.snet.id
-  vm_count                  = 1
+  vm_count                  = 2
   vm_size                   = "Standard_B2s"
 
   plan = {
@@ -100,6 +114,20 @@ module "vm" {
   }
 }
 
-output "vm_public_ips" {
-  value = module.vm.vm_public_ips
+# Load-balancer config specific to this use of the module
+resource "azurerm_lb_probe" "http" {
+  loadbalancer_id = module.vm.lb_id
+  name            = "http-probe"
+  port            = 80
+}
+
+resource "azurerm_lb_rule" "http" {
+  loadbalancer_id                = module.vm.lb_id
+  name                           = "http"
+  protocol                       = "Tcp"
+  frontend_port                  = 80
+  backend_port                   = 80
+  frontend_ip_configuration_name = module.vm.lb_frontend_config
+  backend_address_pool_ids       = [module.vm.lb_backend_pool_id]
+  probe_id                       = azurerm_lb_probe.http.id
 }
