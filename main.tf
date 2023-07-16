@@ -74,10 +74,11 @@ data "azurerm_platform_image" "rocky" {
 
 module "vm" {
   depends_on = [azurerm_marketplace_agreement.rocky]
-  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.0.0"
+  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.0.1"
 
   admin_user                = "frank"
   custom_data               = base64encode(file("cloud-init.yml"))
+  fault_domain_count        = var.fault_domain_count
   location                  = var.location
   network_security_group_id = azurerm_network_security_group.nsg.id
   prefix                    = var.prefix
@@ -98,8 +99,4 @@ module "vm" {
     sku       = data.azurerm_platform_image.rocky.sku
     version   = data.azurerm_platform_image.rocky.version
   }
-}
-
-output "vm_public_ips" {
-  value = module.vm.vm_public_ips
 }

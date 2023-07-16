@@ -4,6 +4,12 @@ variable "allowed_cidr" {
   description = "CIDR range to allow network access from"
 }
 
+variable "fault_domain_count" {
+  type        = number
+  default     = 2
+  description = "Number of fault domains in selected location"
+}
+
 variable "location" {
   type        = string
   default     = "Australia East"
