@@ -1,29 +1,3 @@
-terraform {
-  required_version = "~>1.0"
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~>3"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-}
-
-variable "location" {
-  type        = string
-  default     = "Australia East"
-  description = "Location to create resources in"
-}
-
-variable "prefix" {
-  type        = string
-  default     = "rocky9"
-  description = "Common prefix for resource names"
-}
-
 resource "azurerm_resource_group" "rg" {
   name     = "${var.prefix}-rg"
   location = var.location
@@ -43,6 +17,48 @@ resource "azurerm_subnet" "snet" {
   address_prefixes     = [azurerm_virtual_network.vnet.address_space[0]]
 }
 
+resource "azurerm_network_security_group" "nsg" {
+  name                = "${var.prefix}-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  security_rule {
+    name                       = "allow-ssh"
+    priority                   = 100
+    direction                  = "Inbound"
+    protocol                   = "Tcp"
+    source_address_prefixes    = [var.allowed_cidr]
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+    destination_port_range     = 22
+    access                     = "Allow"
+  }
+
+  security_rule {
+    name                       = "allow-http"
+    priority                   = 110
+    direction                  = "Inbound"
+    protocol                   = "Tcp"
+    source_address_prefixes    = [var.allowed_cidr]
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+    destination_port_range     = 80
+    access                     = "Allow"
+  }
+
+  security_rule {
+    name                       = "deny-others"
+    priority                   = 4000
+    direction                  = "Inbound"
+    protocol                   = "*"
+    source_address_prefix      = "*"
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+    destination_port_range     = "*"
+    access                     = "Deny"
+  }
+}
+
 resource "azurerm_marketplace_agreement" "rocky" {
   publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
   offer     = "rockylinux-9"
@@ -58,17 +74,18 @@ data "azurerm_platform_image" "rocky" {
 
 module "vm" {
   depends_on = [azurerm_marketplace_agreement.rocky]
-  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=1.0.0"
+  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.0.0"
 
-  admin_user          = "frank"
-  allowed_cidr        = "127.0.0.1/32" # Replace with your IP
-  location            = var.location
-  prefix              = var.prefix
-  public_key          = file("~/.ssh/id_rsa.pub")
-  resource_group_name = azurerm_resource_group.rg.name
-  subnet_id           = azurerm_subnet.snet.id
-  vm_count            = 1
-  vm_size             = "Standard_B2s"
+  admin_user                = "frank"
+  custom_data               = base64encode(file("cloud-init.yml"))
+  location                  = var.location
+  network_security_group_id = azurerm_network_security_group.nsg.id
+  prefix                    = var.prefix
+  public_key                = file("~/.ssh/id_rsa.pub")
+  resource_group_name       = azurerm_resource_group.rg.name
+  subnet_id                 = azurerm_subnet.snet.id
+  vm_count                  = 1
+  vm_size                   = "Standard_B2s"
 
   plan = {
     name      = "rockylinux-9"
