@@ -74,7 +74,7 @@ data "azurerm_platform_image" "rocky" {
 
 module "vm" {
   depends_on = [azurerm_marketplace_agreement.rocky]
-  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.0.1"
+  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.2.0"
 
   admin_user                = "frank"
   custom_data               = base64encode(file("cloud-init.yml"))
