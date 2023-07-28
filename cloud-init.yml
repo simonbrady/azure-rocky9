@@ -1,6 +1,7 @@
 #cloud-config
 package_upgrade: true
 packages:
+  - bind-utils
   - nginx
 runcmd:
   - systemctl enable nginx.service
