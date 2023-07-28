@@ -27,7 +27,7 @@ resource "azurerm_network_security_group" "nsg" {
     priority                   = 100
     direction                  = "Inbound"
     protocol                   = "Tcp"
-    source_address_prefixes    = [var.allowed_cidr]
+    source_address_prefixes    = concat([var.allowed_cidr], azurerm_subnet.snet.address_prefixes)
     source_port_range          = "*"
     destination_address_prefix = "*"
     destination_port_range     = 22
