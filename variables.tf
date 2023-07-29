@@ -18,6 +18,6 @@ variable "location" {
 
 variable "prefix" {
   type        = string
-  default     = "rocky9"
+  default     = "ubuntu"
   description = "Common prefix for resource names"
 }

@@ -59,24 +59,17 @@ resource "azurerm_network_security_group" "nsg" {
   }
 }
 
-resource "azurerm_marketplace_agreement" "rocky" {
-  publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
-  offer     = "rockylinux-9"
-  plan      = "rockylinux-9"
-}
-
-data "azurerm_platform_image" "rocky" {
+data "azurerm_platform_image" "ubuntu" {
   location  = var.location
-  publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
-  offer     = "rockylinux-9"
-  sku       = "rockylinux-9"
+  publisher = "Canonical"
+  offer     = "0001-com-ubuntu-server-focal"
+  sku       = "20_04-lts"
 }
 
 module "vm" {
-  depends_on = [azurerm_marketplace_agreement.rocky]
-  source     = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.3.0"
+  source = "git::https://github.com/simonbrady/azure-vm-tf-module.git?ref=2.4.0"
 
-  admin_user                = "frank"
+  admin_user                = "ubuntu"
   custom_data               = base64encode(file("cloud-init.yml"))
   fault_domain_count        = var.fault_domain_count
   location                  = var.location
@@ -88,15 +81,10 @@ module "vm" {
   vm_count                  = 1
   vm_size                   = "Standard_B2s"
 
-  plan = {
-    name      = "rockylinux-9"
-    publisher = "erockyenterprisesoftwarefoundationinc1653071250513"
-    product   = "rockylinux-9"
-  }
   source_image_reference = {
-    publisher = data.azurerm_platform_image.rocky.publisher
-    offer     = data.azurerm_platform_image.rocky.offer
-    sku       = data.azurerm_platform_image.rocky.sku
-    version   = data.azurerm_platform_image.rocky.version
+    publisher = data.azurerm_platform_image.ubuntu.publisher
+    offer     = data.azurerm_platform_image.ubuntu.offer
+    sku       = data.azurerm_platform_image.ubuntu.sku
+    version   = data.azurerm_platform_image.ubuntu.version
   }
 }
